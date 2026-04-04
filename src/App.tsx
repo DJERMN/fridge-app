@@ -35,7 +35,7 @@ function App() {
       <main className="flex-1 overflow-y-auto pb-24">
         {activeTab === 'stock' && <StockTab items={items} apiKey={settings.openRouterApiKey} onItemsChange={setItems} />}
         {activeTab === 'shopping' && <ShoppingTab items={items} onItemsChange={setItems} />}
-        {activeTab === 'settings' && <SettingsTab settings={settings} onSave={setSettings} />}
+        {activeTab === 'settings' && <SettingsTab settings={settings} onSave={setSettings} items={items} onItemsChange={setItems} />}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t"
