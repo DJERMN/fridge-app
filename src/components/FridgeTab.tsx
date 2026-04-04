@@ -53,6 +53,7 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>('image/jpeg');
   const [loading, setLoading] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState<number>(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newQty, setNewQty] = useState('');
@@ -74,10 +75,10 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
 
   const handleAnalyze = async () => {
     if (!imageBase64) return toast.error('Kein Bild ausgewählt.');
-    if (!apiKey) return toast.error('Bitte zuerst einen Gemini API Key in den Einstellungen eingeben.');
+    if (!apiKey) return toast.error('Bitte zuerst einen OpenRouter API Key in den Einstellungen eingeben.');
     setLoading(true);
     try {
-      const detected = await analyzeImage(imageBase64, mimeType, apiKey);
+      const detected = await analyzeImage(imageBase64, mimeType, apiKey, (s) => setRetryCountdown(s));
       if (detected.length === 0) {
         toast('Keine Lebensmittel erkannt. Versuche ein klareres Foto.', { icon: '🔍' });
       } else {
@@ -95,6 +96,7 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
       toast.error('Fehler bei der Analyse: ' + msg);
     } finally {
       setLoading(false);
+      setRetryCountdown(0);
     }
   };
 
@@ -143,7 +145,9 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
               className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:opacity-60 text-white font-semibold flex items-center justify-center gap-2 transition"
             >
               {loading ? (
-                <><Loader2 size={18} className="animate-spin" /> Analysiere…</>
+                retryCountdown > 0
+                  ? <><Loader2 size={18} className="animate-spin" /> Rate Limit – nächstes Modell in {retryCountdown}s…</>
+                  : <><Loader2 size={18} className="animate-spin" /> Analysiere…</>
               ) : (
                 <><ScanLine size={18} /> Analysieren</>
               )}

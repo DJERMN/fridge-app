@@ -9,12 +9,12 @@ interface Props {
 }
 
 export default function SettingsTab({ settings, onSave }: Props) {
-  const [apiKey, setApiKey] = useState(settings.geminiApiKey);
+  const [apiKey, setApiKey] = useState(settings.openRouterApiKey);
   const [language, setLanguage] = useState<'de' | 'en'>(settings.language ?? 'de');
   const [showKey, setShowKey] = useState(false);
 
   const handleSave = () => {
-    onSave({ geminiApiKey: apiKey.trim(), language });
+    onSave({ openRouterApiKey: apiKey.trim(), language });
     toast.success('Einstellungen gespeichert!');
   };
 
@@ -25,18 +25,18 @@ export default function SettingsTab({ settings, onSave }: Props) {
         <p className="text-slate-400 text-sm">Konfiguriere deine App-Einstellungen</p>
       </div>
 
-      {/* API Key */}
       <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-3">
-        <div className="flex items-center gap-2 text-emerald-400">
-          <Key size={18} />
-          <span className="font-semibold text-sm text-white">Gemini API Key</span>
+        <div className="flex items-center gap-2">
+          <Key size={18} className="text-emerald-400" />
+          <span className="font-semibold text-sm text-white">OpenRouter API Key</span>
+          <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">Kostenlos</span>
         </div>
         <div className="relative">
           <input
             type={showKey ? 'text' : 'password'}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="AIza..."
+            placeholder="sk-or-v1-..."
             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm pr-12 focus:outline-none focus:border-blue-500 transition"
           />
           <button
@@ -47,24 +47,29 @@ export default function SettingsTab({ settings, onSave }: Props) {
             {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
-        <p className="text-slate-500 text-xs">
-          Der API Key wird ausschließlich lokal in deinem Browser gespeichert und nie an
-          Dritte weitergegeben.
-        </p>
+        <p className="text-slate-500 text-xs">Kein Kreditkarte nötig. Wird nur lokal gespeichert.</p>
         <a
-          href="https://aistudio.google.com/app/apikey"
+          href="https://openrouter.ai/keys"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs transition"
         >
           <ExternalLink size={13} />
-          Kostenlosen Gemini API Key holen
+          Kostenlosen Key holen → openrouter.ai/keys
         </a>
       </div>
 
-      {/* Language */}
+      <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-2">
+        <span className="font-semibold text-sm text-white">AI-Modelle (automatischer Fallback)</span>
+        <ul className="text-slate-400 text-xs space-y-1">
+          <li>1. Llama 4 Scout (Meta)</li>
+          <li>2. Gemini 2.0 Flash Exp (Google)</li>
+          <li>3. Qwen 2.5 VL 72B (Alibaba)</li>
+        </ul>
+      </div>
+
       <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-3">
-        <span className="font-semibold text-sm text-white">Sprache / Language</span>
+        <span className="font-semibold text-sm text-white">Sprache</span>
         <div className="flex gap-3">
           {(['de', 'en'] as const).map((lang) => (
             <button
@@ -76,25 +81,15 @@ export default function SettingsTab({ settings, onSave }: Props) {
                   : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
               }`}
             >
-              {lang === 'de' ? '🇩🇪 Deutsch' : '🇬🇧 English'}
+              {lang === 'de' ? 'Deutsch' : 'English'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Info */}
-      <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-2">
-        <span className="font-semibold text-sm text-white">Über diese App</span>
-        <p className="text-slate-400 text-xs leading-relaxed">
-          📸 Mach ein Foto deines Kühlschranks, und die KI erkennt automatisch alle
-          Lebensmittel. Verwalte deinen Kühlschrank-Inhalt und erstelle eine Einkaufsliste
-          für fehlende Produkte.
-        </p>
-      </div>
-
       <button
         onClick={handleSave}
-        className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition"
+        className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition"
       >
         <Save size={18} />
         Speichern

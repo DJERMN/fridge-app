@@ -9,6 +9,6 @@ export interface FridgeItem {
 }
 
 export interface AppSettings {
-  geminiApiKey: string;
+  openRouterApiKey: string;
   language: 'de' | 'en';
 }

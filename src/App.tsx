@@ -10,7 +10,7 @@ import type { FridgeItem, AppSettings } from './types';
 type Tab = 'fridge' | 'shopping' | 'settings';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  geminiApiKey: '',
+  openRouterApiKey: '',
   language: 'de',
 };
 
@@ -52,7 +52,7 @@ function App() {
       {/* Content */}
       <main className="flex-1 overflow-y-auto pb-24">
         {activeTab === 'fridge' && (
-          <FridgeTab items={items} apiKey={settings.geminiApiKey} onItemsChange={setItems} />
+          <FridgeTab items={items} apiKey={settings.openRouterApiKey} onItemsChange={setItems} />
         )}
         {activeTab === 'shopping' && (
           <ShoppingTab items={items} onItemsChange={setItems} />
