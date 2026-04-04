@@ -27,7 +27,7 @@ function App() {
       <header className="sticky top-0 z-10 flex items-center justify-center px-4 py-3 border-b"
         style={{ background: '#0f172a', borderColor: '#1e293b' }}>
         <div className="flex items-center gap-2">
-          <span className="text-xl">ðŸ§Š</span>
+          <span className="text-xl">{'\u{1F9CA}'}</span>
           <span className="text-white font-bold text-lg tracking-tight">FridgeMate</span>
         </div>
       </header>

@@ -50,7 +50,7 @@ export default function ShoppingTab({ items, onItemsChange }: Props) {
   if (shoppingItems.length === 0) {
     return (
       <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] text-center space-y-3">
-        <div className="text-6xl">ðŸŽ‰</div>
+        <div className="text-6xl">{'\u{1F389}'}</div>
         <p className="text-white font-semibold text-lg">All good!</p>
         <p className="text-slate-400 text-sm">Your fridge is well stocked.</p>
       </div>

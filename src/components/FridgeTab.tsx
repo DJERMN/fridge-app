@@ -12,21 +12,21 @@ interface Props {
 
 function getFoodEmoji(name: string): string {
   const n = name.toLowerCase();
-  if (/milk|yogurt|cream|kefir|dairy/.test(n)) return 'ðŸ¥›';
-  if (/cheese|gouda|cheddar|mozzarella|brie/.test(n)) return 'ðŸ§€';
-  if (/butter|margarine/.test(n)) return 'ðŸ§ˆ';
-  if (/egg|eggs/.test(n)) return 'ðŸ¥š';
-  if (/meat|beef|pork|chicken|turkey|salmon|fish|tuna|ham|sausage|steak/.test(n)) return 'ðŸ¥©';
-  if (/vegetable|carrot|pepper|cucumber|tomato|lettuce|spinach|broccoli|zucchini|onion/.test(n)) return 'ðŸ¥¬';
-  if (/apple|pear|orange|lemon|berry|grape|strawberry|cherry|mango|pineapple|fruit/.test(n)) return 'ðŸŽ';
-  if (/juice|cola|beer|wine|soda|water|drink|bottle/.test(n)) return 'ðŸ§ƒ';
-  if (/ketchup|mustard|mayo|sauce|dressing|jam|honey|condiment/.test(n)) return 'ðŸ«™';
-  if (/bread|roll|toast/.test(n)) return 'ðŸž';
-  if (/pizza|pasta|noodle|leftover/.test(n)) return 'ðŸ•';
-  if (/can|canned|tin/.test(n)) return 'ðŸ¥«';
-  if (/chocolate|pudding|dessert|cake/.test(n)) return 'ðŸ«';
-  if (/tofu|tempeh/.test(n)) return 'ðŸ«˜';
-  return 'ðŸ±';
+  if (/milk|yogurt|cream|kefir|dairy/.test(n)) return '\u{1F95B}';
+  if (/cheese|gouda|cheddar|mozzarella|brie/.test(n)) return '\u{1F9C0}';
+  if (/butter|margarine/.test(n)) return '\u{1F9C8}';
+  if (/egg|eggs/.test(n)) return '\u{1F95A}';
+  if (/meat|beef|pork|chicken|turkey|salmon|fish|tuna|ham|sausage|steak/.test(n)) return '\u{1F969}';
+  if (/vegetable|carrot|pepper|cucumber|tomato|lettuce|spinach|broccoli|zucchini|onion/.test(n)) return '\u{1F96C}';
+  if (/apple|pear|orange|lemon|berry|grape|strawberry|cherry|mango|pineapple|fruit/.test(n)) return '\u{1F34E}';
+  if (/juice|cola|beer|wine|soda|water|drink|bottle/.test(n)) return '\u{1F9C3}';
+  if (/ketchup|mustard|mayo|sauce|dressing|jam|honey|condiment/.test(n)) return '\u{1FAD9}';
+  if (/bread|roll|toast/.test(n)) return '\u{1F35E}';
+  if (/pizza|pasta|noodle|leftover/.test(n)) return '\u{1F355}';
+  if (/can|canned|tin/.test(n)) return '\u{1F96B}';
+  if (/chocolate|pudding|dessert|cake/.test(n)) return '\u{1F36B}';
+  if (/tofu|tempeh/.test(n)) return '\u{1FAD8}';
+  return '\u{1F371}';
 }
 
 const STATUS_CYCLE: Record<ItemStatus, ItemStatus> = { ok: 'low', low: 'empty', empty: 'ok' };
@@ -67,7 +67,7 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
     try {
       const detected = await analyzeImage(imageBase64, mimeType, apiKey);
       if (detected.length === 0) {
-        toast('No food items detected. Try a clearer photo.', { icon: 'ðŸ"' });
+        toast('No food items detected. Try a clearer photo.', { icon: '\u{1F4F7}' });
       } else {
         const existingNames = new Set(items.map((i) => i.name.toLowerCase()));
         const fresh = detected.filter((d) => !existingNames.has(d.name.toLowerCase()));
@@ -130,7 +130,7 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
           </div>
         ) : (
           <div className="p-6 text-center space-y-4">
-            <div className="text-5xl">ðŸ"¸</div>
+            <div className="text-5xl">{'\u{1F4F8}'}</div>
             <p className="text-slate-400 text-sm">Take a photo of your fridge or upload an image</p>
             <div className="flex gap-3">
               <button
@@ -184,7 +184,7 @@ export default function FridgeTab({ items, apiKey, onItemsChange }: Props) {
       {/* Inventory */}
       {items.length === 0 ? (
         <div className="text-center py-16 space-y-3">
-          <div className="text-6xl">ðŸ§Š</div>
+          <div className="text-6xl">{'\u{1F9CA}'}</div>
           <p className="text-slate-400 text-sm">Your fridge is empty.</p>
           <p className="text-slate-500 text-xs">Take a photo to get started!</p>
         </div>
