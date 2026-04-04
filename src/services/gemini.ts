@@ -47,7 +47,16 @@ export async function analyzeImage(
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${err}`);
+    if (response.status === 429) {
+      throw new Error('Rate Limit erreicht. Bitte warte 1 Minute und versuche es erneut.');
+    }
+    if (response.status === 400) {
+      throw new Error('Ungültige Anfrage. Bitte prüfe den API Key in den Einstellungen.');
+    }
+    if (response.status === 403) {
+      throw new Error('API Key ungültig oder keine Berechtigung. Bitte prüfe den Key in den Einstellungen.');
+    }
+    throw new Error(`Gemini API Fehler ${response.status}: ${err}`);
   }
 
   const data = (await response.json()) as GeminiResponse;
