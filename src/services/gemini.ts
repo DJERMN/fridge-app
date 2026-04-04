@@ -20,7 +20,7 @@ Rules:
 - Each visible item as a separate entry
 - If nothing is recognizable: []`;
 
-const MODEL = 'meta-llama/llama-3.2-11b-vision-instruct:free';
+const MODEL = 'qwen/qwen3.6-plus:free';
 
 interface RawItem {
   name?: string;
