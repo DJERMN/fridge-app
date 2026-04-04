@@ -1,14 +1,12 @@
-export type ItemStatus = 'ok' | 'low' | 'empty';
-
-export interface FridgeItem {
+export interface StockItem {
   id: string;
   name: string;
-  quantity: string;
-  status: ItemStatus;
+  unit: string;
+  targetQty: number;  // SOLL
+  currentQty: number; // IST
   addedAt: number;
 }
 
 export interface AppSettings {
   openRouterApiKey: string;
-  language: 'de' | 'en';
 }

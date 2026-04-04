@@ -1,34 +1,35 @@
-import type { FridgeItem } from '../types';
+export interface DetectedItem {
+  name: string;
+  quantity: number;
+  unit: string;
+}
 
-const PROMPT = `Look carefully at this image.
+const PROMPT = `Look at this image carefully.
 
-Answer these questions about what you see:
-1. What food items and drinks are visible?
-2. How many pieces/units of each item can you count (e.g. "3 bottles", "2 eggs", "1 pack")?
-3. How full or how much is left of each item (e.g. "almost full", "half full", "almost empty")?
+List every food item and drink you can see.
+For each item provide:
+- name: product name in English
+- quantity: a number (count individual pieces, bottles, packs - estimate if needed)
+- unit: measurement unit (e.g. "bottles", "pcs", "packs", "kg", "l", "cans")
 
-Reply ONLY with a JSON array. No text before or after. No markdown backticks. Example:
+Reply ONLY with a JSON array. No markdown backticks. No text before or after. Example:
 [
-  {"name": "Milk", "quantity": "2 bottles, almost full", "status": "ok"},
-  {"name": "Butter", "quantity": "1 pack, half used", "status": "low"}
+  {"name": "Milk", "quantity": 2, "unit": "bottles"},
+  {"name": "Eggs", "quantity": 6, "unit": "pcs"},
+  {"name": "Butter", "quantity": 1, "unit": "pack"}
 ]
 
-Rules:
-- "name": product name in English
-- "quantity": count + unit + fill level, as precise as possible
-- "status": "ok" (enough available), "low" (running low, buy soon), "empty" (gone or almost gone)
-- Each visible item as a separate entry
-- If nothing is recognizable: []`;
+If nothing is recognizable: []`;
 
 const MODEL = 'qwen/qwen3.6-plus:free';
 
 interface RawItem {
   name?: string;
-  quantity?: string;
-  status?: string;
+  quantity?: number | string;
+  unit?: string;
 }
 
-function parseItems(text: string): FridgeItem[] {
+function parseItems(text: string): DetectedItem[] {
   const cleaned = text
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
@@ -56,13 +57,9 @@ function parseItems(text: string): FridgeItem[] {
   return parsed
     .filter((item) => item && typeof item.name === 'string' && item.name.trim().length > 0)
     .map((item) => ({
-      id: crypto.randomUUID(),
       name: item.name!.trim(),
-      quantity: typeof item.quantity === 'string' ? item.quantity.trim() : '',
-      status: (['ok', 'low', 'empty'].includes(item.status ?? '')
-        ? item.status
-        : 'ok') as 'ok' | 'low' | 'empty',
-      addedAt: Date.now(),
+      quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(String(item.quantity ?? '1'), 10) || 1,
+      unit: typeof item.unit === 'string' ? item.unit.trim() : 'pcs',
     }));
 }
 
@@ -70,7 +67,7 @@ export async function analyzeImage(
   imageBase64: string,
   mimeType: string,
   apiKey: string
-): Promise<FridgeItem[]> {
+): Promise<DetectedItem[]> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -95,12 +92,8 @@ export async function analyzeImage(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    if (response.status === 429) {
-      throw new Error('Rate limit reached. Please wait 1 minute and try again.');
-    }
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Invalid API key. Please check your key in Settings (openrouter.ai/keys).');
-    }
+    if (response.status === 429) throw new Error('Rate limit reached. Please wait a moment and try again.');
+    if (response.status === 401 || response.status === 403) throw new Error('Invalid API key. Please check Settings.');
     throw new Error(`Error ${response.status}: ${body.slice(0, 200)}`);
   }
 

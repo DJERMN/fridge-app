@@ -1,22 +1,22 @@
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ShoppingCart, Settings, Snowflake } from 'lucide-react';
-import FridgeTab from './components/FridgeTab';
+import StockTab from './components/StockTab';
 import ShoppingTab from './components/ShoppingTab';
 import SettingsTab from './components/SettingsTab';
 import useLocalStorage from './hooks/useLocalStorage';
-import type { FridgeItem, AppSettings } from './types';
+import type { StockItem, AppSettings } from './types';
 
-type Tab = 'fridge' | 'shopping' | 'settings';
+type Tab = 'stock' | 'shopping' | 'settings';
 
-const DEFAULT_SETTINGS: AppSettings = { openRouterApiKey: '', language: 'en' };
+const DEFAULT_SETTINGS: AppSettings = { openRouterApiKey: '' };
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('fridge');
-  const [items, setItems] = useLocalStorage<FridgeItem[]>('fridge-items', []);
+  const [activeTab, setActiveTab] = useState<Tab>('stock');
+  const [items, setItems] = useLocalStorage<StockItem[]>('fridge-items', []);
   const [settings, setSettings] = useLocalStorage<AppSettings>('fridge-settings', DEFAULT_SETTINGS);
 
-  const shoppingCount = items.filter((i) => i.status === 'low' || i.status === 'empty').length;
+  const deficitCount = items.filter((i) => i.targetQty > 0 && i.currentQty < i.targetQty).length;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#0f172a', fontFamily: 'system-ui, sans-serif' }}>
@@ -33,22 +33,22 @@ function App() {
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24">
-        {activeTab === 'fridge' && <FridgeTab items={items} apiKey={settings.openRouterApiKey} onItemsChange={setItems} />}
+        {activeTab === 'stock' && <StockTab items={items} apiKey={settings.openRouterApiKey} onItemsChange={setItems} />}
         {activeTab === 'shopping' && <ShoppingTab items={items} onItemsChange={setItems} />}
         {activeTab === 'settings' && <SettingsTab settings={settings} onSave={setSettings} />}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t"
         style={{ background: '#0f172a', borderColor: '#1e293b' }}>
-        <TabButton active={activeTab === 'fridge'} onClick={() => setActiveTab('fridge')}
-          icon={<Snowflake size={22} />} label="Fridge" />
+        <TabButton active={activeTab === 'stock'} onClick={() => setActiveTab('stock')}
+          icon={<Snowflake size={22} />} label="Stock" />
         <TabButton active={activeTab === 'shopping'} onClick={() => setActiveTab('shopping')}
           icon={
             <div className="relative">
               <ShoppingCart size={22} />
-              {shoppingCount > 0 && (
+              {deficitCount > 0 && (
                 <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                  {shoppingCount > 9 ? '9+' : shoppingCount}
+                  {deficitCount > 9 ? '9+' : deficitCount}
                 </span>
               )}
             </div>
