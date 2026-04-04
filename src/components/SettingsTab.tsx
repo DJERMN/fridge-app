@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Eye, EyeOff, Save, Key, ExternalLink, Camera, Upload, Loader2, Plus, X, Minus, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { AppSettings, StockItem } from '../types';
-import { analyzeImage } from '../services/gemini';
+import { analyzeImage, normalizeItems } from '../services/gemini';
 
 interface Props {
   settings: AppSettings;
@@ -70,9 +70,13 @@ export default function SettingsTab({ settings, onSave, items, onItemsChange }: 
       if (detected.length === 0) {
         toast('No items detected. Try a clearer photo.', { icon: '\u{1F4F7}' });
       } else {
+        // Normalize against existing names to prevent duplicates
+        const existingNames = items.map((i) => i.name);
+        const normalized = await normalizeItems(existingNames, detected, apiKey.trim());
+
         const updated = [...items];
         let newCount = 0;
-        for (const d of detected) {
+        for (const d of normalized) {
           const idx = updated.findIndex((i) => i.name.toLowerCase() === d.name.toLowerCase());
           if (idx >= 0) {
             updated[idx] = { ...updated[idx], targetQty: d.quantity, unit: d.unit };
@@ -89,7 +93,7 @@ export default function SettingsTab({ settings, onSave, items, onItemsChange }: 
           }
         }
         onItemsChange(updated);
-        toast.success(`${detected.length} target items set${newCount > 0 ? ` (${newCount} new)` : ''}`);
+        toast.success(`${normalized.length} target items set${newCount > 0 ? ` (${newCount} new)` : ''}`);
       }
       setPreview(null);
       setImageBase64(null);

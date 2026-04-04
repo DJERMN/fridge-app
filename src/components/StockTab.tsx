@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Camera, Upload, Loader2, Plus, X, Minus, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { StockItem } from '../types';
-import { analyzeImage } from '../services/gemini';
+import { analyzeImage, normalizeItems } from '../services/gemini';
 
 interface Props {
   items: StockItem[];
@@ -58,9 +58,13 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
       if (detected.length === 0) {
         toast('No items detected. Try a clearer photo.', { icon: '\u{1F4F7}' });
       } else {
+        // Normalize names against existing inventory to avoid duplicates
+        const existingNames = items.map((i) => i.name);
+        const normalized = await normalizeItems(existingNames, detected, apiKey);
+
         const updated = [...items];
         let newCount = 0;
-        for (const d of detected) {
+        for (const d of normalized) {
           const idx = updated.findIndex((i) => i.name.toLowerCase() === d.name.toLowerCase());
           if (idx >= 0) {
             updated[idx] = { ...updated[idx], currentQty: d.quantity, unit: d.unit };
@@ -77,7 +81,7 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
           }
         }
         onItemsChange(updated);
-        toast.success(`${detected.length} item(s) scanned${newCount > 0 ? `, ${newCount} new` : ''}`);
+        toast.success(`${normalized.length} item(s) scanned${newCount > 0 ? `, ${newCount} new` : ''}`);
       }
       setPreview(null);
       setImageBase64(null);

@@ -4,7 +4,9 @@ export interface DetectedItem {
   unit: string;
 }
 
-const PROMPT = `Look at this image carefully.
+const MODEL = 'qwen/qwen3.6-plus:free';
+
+const SCAN_PROMPT = `Look at this image carefully.
 
 List every food item and drink you can see.
 For each item provide:
@@ -20,8 +22,6 @@ Reply ONLY with a JSON array. No markdown backticks. No text before or after. Ex
 ]
 
 If nothing is recognizable: []`;
-
-const MODEL = 'qwen/qwen3.6-plus:free';
 
 interface RawItem {
   name?: string;
@@ -42,18 +42,12 @@ function parseItems(text: string): DetectedItem[] {
   } catch {
     const match = cleaned.match(/\[[\s\S]*\]/);
     if (match) {
-      try {
-        parsed = JSON.parse(match[0]) as RawItem[];
-      } catch {
-        throw new Error('AI returned invalid JSON: ' + cleaned.slice(0, 150));
-      }
-    } else {
-      throw new Error('AI returned invalid JSON: ' + cleaned.slice(0, 150));
-    }
+      try { parsed = JSON.parse(match[0]) as RawItem[]; }
+      catch { return []; }
+    } else { return []; }
   }
 
   if (!Array.isArray(parsed)) return [];
-
   return parsed
     .filter((item) => item && typeof item.name === 'string' && item.name.trim().length > 0)
     .map((item) => ({
@@ -63,11 +57,7 @@ function parseItems(text: string): DetectedItem[] {
     }));
 }
 
-export async function analyzeImage(
-  imageBase64: string,
-  mimeType: string,
-  apiKey: string
-): Promise<DetectedItem[]> {
+async function callAPI(messages: object[], apiKey: string): Promise<string> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -76,18 +66,7 @@ export async function analyzeImage(
       'HTTP-Referer': 'https://djermn.github.io/fridge-app/',
       'X-Title': 'FridgeMate',
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-            { type: 'text', text: PROMPT },
-          ],
-        },
-      ],
-    }),
+    body: JSON.stringify({ model: MODEL, messages }),
   });
 
   if (!response.ok) {
@@ -98,6 +77,57 @@ export async function analyzeImage(
   }
 
   const data = await response.json();
-  const text: string = data?.choices?.[0]?.message?.content ?? '[]';
+  return data?.choices?.[0]?.message?.content ?? '[]';
+}
+
+export async function analyzeImage(
+  imageBase64: string,
+  mimeType: string,
+  apiKey: string
+): Promise<DetectedItem[]> {
+  const text = await callAPI([
+    {
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+        { type: 'text', text: SCAN_PROMPT },
+      ],
+    },
+  ], apiKey);
   return parseItems(text);
+}
+
+/**
+ * Second AI pass: normalizes new scan results against existing item names.
+ * Prevents duplicates like "Milk" vs "Whole Milk" vs "2% Milk".
+ * Only called when existing items are present.
+ */
+export async function normalizeItems(
+  existingNames: string[],
+  newItems: DetectedItem[],
+  apiKey: string
+): Promise<DetectedItem[]> {
+  if (existingNames.length === 0 || newItems.length === 0) return newItems;
+
+  const prompt = `You are merging a new fridge scan into an existing inventory.
+
+Existing inventory item names:
+${existingNames.map((n) => `- ${n}`).join('\n')}
+
+New scanned items:
+${JSON.stringify(newItems, null, 2)}
+
+Task:
+1. For each new item, check if it refers to the same product as an existing inventory item (e.g. "Whole Milk" = "Milk", "OJ" = "Orange Juice", "Coke" = "Cola").
+2. If it matches an existing name, use the EXACT existing name.
+3. If it does not match any existing item, keep the new item name as-is.
+4. Do NOT merge different products. Do NOT remove items.
+
+Reply ONLY with a JSON array using the resolved names. No markdown. Example:
+[{"name": "Milk", "quantity": 2, "unit": "bottles"}, {"name": "Eggs", "quantity": 6, "unit": "pcs"}]`;
+
+  const text = await callAPI([{ role: 'user', content: prompt }], apiKey);
+  const normalized = parseItems(text);
+  // Fallback: if normalization fails or returns empty, return original
+  return normalized.length > 0 ? normalized : newItems;
 }
