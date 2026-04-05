@@ -11,9 +11,10 @@ export interface ReconciledItem {
   unit: string;
 }
 
-const MODEL = 'qwen/qwen3.6-plus:free';
+const IMAGE_MODEL = 'google/gemma-3-27b-it:free'; // Best free vision model
+const TEXT_MODEL = 'qwen/qwen3.6-plus:free';      // Best free text model
 
-const SCAN_PROMPT = `Look at this image carefully.
+const SCAN_PROMPT_BASE = `Look at this image carefully.
 
 List every food item and drink you can see.
 For each item provide:
@@ -28,6 +29,16 @@ Reply ONLY with a JSON array. No markdown backticks. No text before or after. Ex
 ]
 
 If nothing is recognizable: []`;
+
+function buildScanPrompt(existingNames: string[]): string {
+  if (existingNames.length === 0) return SCAN_PROMPT_BASE;
+  return `${SCAN_PROMPT_BASE}
+
+IMPORTANT: We already track these items in inventory:
+${existingNames.map((n) => `- ${n}`).join('\n')}
+
+If a detected item refers to the same product as one above (e.g. "Whole Milk" = "Milk"), use the EXACT existing name. Otherwise use a clear English name.`;
+}
 
 interface RawItem {
   name?: string;
@@ -61,7 +72,7 @@ function parseItems(text: string): DetectedItem[] {
     }));
 }
 
-async function callAPI(messages: object[], apiKey: string): Promise<string> {
+async function callAPI(messages: object[], apiKey: string, model: string): Promise<string> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -70,7 +81,7 @@ async function callAPI(messages: object[], apiKey: string): Promise<string> {
       'HTTP-Referer': 'https://djermn.github.io/fridge-app/',
       'X-Title': 'FridgeMate',
     },
-    body: JSON.stringify({ model: MODEL, messages }),
+    body: JSON.stringify({ model, messages }),
   });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -85,23 +96,23 @@ async function callAPI(messages: object[], apiKey: string): Promise<string> {
 export async function analyzeImage(
   imageBase64: string,
   mimeType: string,
-  apiKey: string
+  apiKey: string,
+  existingNames: string[] = []
 ): Promise<DetectedItem[]> {
   const text = await callAPI([
     {
       role: 'user',
       content: [
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-        { type: 'text', text: SCAN_PROMPT },
+        { type: 'text', text: buildScanPrompt(existingNames) },
       ],
     },
-  ], apiKey);
+  ], apiKey, IMAGE_MODEL);
   return parseItems(text);
 }
 
 /**
- * Normalizes new scan names against existing inventory names.
- * Prevents duplicates like "Whole Milk" vs "Milk".
+ * @deprecated Use analyzeImage with existingNames param instead (saves one API call)
  */
 export async function normalizeItems(
   existingNames: string[],
@@ -126,7 +137,7 @@ Rules:
 Reply ONLY with a JSON array:
 [{"name": "...", "quantity": N, "unit": "..."}]`;
 
-  const text = await callAPI([{ role: 'user', content: prompt }], apiKey);
+  const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODEL);
   const result = parseItems(text);
   return result.length > 0 ? result : newItems;
 }
@@ -165,7 +176,7 @@ Reply ONLY with a JSON array. No markdown. Example:
   {"name": "Leftover Pizza", "targetQty": 0, "currentQty": 2, "unit": "slices"}
 ]`;
 
-  const text = await callAPI([{ role: 'user', content: prompt }], apiKey);
+  const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODEL);
   const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 
   interface RawReconciled { name?: string; targetQty?: number | string; currentQty?: number | string; unit?: string; }

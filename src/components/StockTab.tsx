@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Camera, Upload, Loader2, X, Minus, Plus, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { StockItem } from '../types';
-import { analyzeImage, normalizeItems } from '../services/gemini';
+import { analyzeImage } from '../services/gemini';
 import { compressImage } from '../utils/compressImage';
 
 interface Props {
@@ -60,12 +60,11 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
     if (!apiKey) return toast.error('Please add your OpenRouter API key in Settings first.');
     setLoading(true);
     try {
-      const detected = await analyzeImage(imageBase64, mimeType, apiKey);
-      if (detected.length === 0) {
+      const existingNames = items.map((i) => i.name);
+      const normalized = await analyzeImage(imageBase64, mimeType, apiKey, existingNames);
+      if (normalized.length === 0) {
         toast('No items detected. Try a clearer photo.', { icon: '\u{1F4F7}' });
       } else {
-        const existingNames = items.map((i) => i.name);
-        const normalized = await normalizeItems(existingNames, detected, apiKey);
 
         // Reset all current quantities to 0, then apply scan results
         let updated = items.map((i) => ({ ...i, currentQty: 0 }));
