@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Copy, CheckSquare, Check, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { StockItem } from '../types';
@@ -37,11 +37,19 @@ function ItemRow({ item, checked, onToggle }: {
 export default function ShoppingTab({ items, onItemsChange, apiKey }: Props) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
+  const didAutoMerge = useRef(false);
 
   const deficitItems = items
     .filter((i) => i.targetQty > 0 && i.currentQty < i.targetQty)
     .map((i) => ({ ...i, deficit: i.targetQty - i.currentQty }))
     .sort((a, b) => b.deficit - a.deficit);
+
+  useEffect(() => {
+    if (didAutoMerge.current) return;
+    if (!apiKey || items.length === 0) return;
+    didAutoMerge.current = true;
+    runMerge(true);
+  }, []);
 
   const toggleCheck = (id: string) => {
     setChecked((prev) => {
@@ -68,8 +76,8 @@ export default function ShoppingTab({ items, onItemsChange, apiKey }: Props) {
       .catch(() => toast.error('Copy failed.'));
   };
 
-  const mergeDuplicates = async () => {
-    if (!apiKey) return toast.error('Please add your OpenRouter API key in Settings first.');
+  const runMerge = async (silent = false) => {
+    if (!apiKey) { if (!silent) toast.error('Please add your OpenRouter API key in Settings first.'); return; }
     setMerging(true);
     try {
       const sollItems = items
@@ -80,7 +88,7 @@ export default function ShoppingTab({ items, onItemsChange, apiKey }: Props) {
         .map((i) => ({ name: i.name, currentQty: i.currentQty, unit: i.unit }));
 
       const reconciled = await reconcileInventory(sollItems, istItems, apiKey);
-      if (reconciled.length === 0) return toast.error('No result from AI. Try again.');
+      if (reconciled.length === 0) { if (!silent) toast.error('No result from AI. Try again.'); return; }
 
       const updated: StockItem[] = reconciled.map((r) => ({
         id: items.find((i) => i.name.toLowerCase() === r.name.toLowerCase())?.id
@@ -94,15 +102,24 @@ export default function ShoppingTab({ items, onItemsChange, apiKey }: Props) {
       }));
       onItemsChange(updated);
       setChecked(new Set());
-      toast.success('Duplicates merged!');
+      if (!silent) toast.success('Duplicates merged!');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error merging items.');
+      if (!silent) toast.error(e instanceof Error ? e.message : 'Error merging items.');
     } finally {
       setMerging(false);
     }
   };
 
-  if (deficitItems.length === 0) {
+  if (merging && deficitItems.length === 0) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] text-center space-y-3">
+        <RefreshCw size={32} className="text-slate-400 animate-spin" />
+        <p className="text-slate-400 text-sm">Analysing list...</p>
+      </div>
+    );
+  }
+
+  if (!merging && deficitItems.length === 0) {
     return (
       <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] text-center space-y-3">
         <div className="text-6xl">{'\u{1F389}'}</div>
@@ -126,7 +143,7 @@ export default function ShoppingTab({ items, onItemsChange, apiKey }: Props) {
           className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition">
           <Copy size={15} /> Copy list
         </button>
-        <button onClick={mergeDuplicates} disabled={merging}
+        <button onClick={() => runMerge()} disabled={merging}
           className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition disabled:opacity-50">
           <RefreshCw size={15} className={merging ? 'animate-spin' : ''} />
           {merging ? 'Merging...' : 'Merge duplicates'}
