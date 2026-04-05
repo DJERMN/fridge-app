@@ -4,6 +4,7 @@ export interface StockItem {
   unit: string;
   targetQty: number;  // SOLL
   currentQty: number; // IST
+  category?: string;
   addedAt: number;
 }
 

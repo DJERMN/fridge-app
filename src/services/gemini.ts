@@ -9,6 +9,7 @@ export interface ReconciledItem {
   targetQty: number;
   currentQty: number;
   unit: string;
+  category: string;
 }
 
 const IMAGE_MODELS = [
@@ -183,18 +184,22 @@ Task:
 3. Items only in SOLL get currentQty: 0.
 4. Items only in IST get targetQty: 0.
 5. Never create duplicate entries for the same product.
+6. Assign each item a supermarket aisle category in German. Use exactly these categories:
+   Obst & Gemüse, Milch & Käse, Fleisch & Wurst, Fisch & Meeresfrüchte, Tiefkühl,
+   Brot & Backwaren, Getränke, Konserven & Fertiggerichte, Snacks & Süßigkeiten,
+   Gewürze & Saucen, Frühstück & Cerealien, Haushalt & Hygiene, Sonstiges
 
 Reply ONLY with a JSON array. No markdown. Example:
 [
-  {"name": "Milk", "targetQty": 2, "currentQty": 1, "unit": "bottles"},
-  {"name": "Eggs", "targetQty": 12, "currentQty": 12, "unit": "pcs"},
-  {"name": "Leftover Pizza", "targetQty": 0, "currentQty": 2, "unit": "slices"}
+  {"name": "Milk", "targetQty": 2, "currentQty": 1, "unit": "bottles", "category": "Milch & Käse"},
+  {"name": "Eggs", "targetQty": 12, "currentQty": 12, "unit": "pcs", "category": "Milch & Käse"},
+  {"name": "Leftover Pizza", "targetQty": 0, "currentQty": 2, "unit": "slices", "category": "Tiefkühl"}
 ]`;
 
   const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODELS);
   const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 
-  interface RawReconciled { name?: string; targetQty?: number | string; currentQty?: number | string; unit?: string; }
+  interface RawReconciled { name?: string; targetQty?: number | string; currentQty?: number | string; unit?: string; category?: string; }
   let parsed: RawReconciled[];
   try {
     parsed = JSON.parse(cleaned) as RawReconciled[];
@@ -216,5 +221,6 @@ Reply ONLY with a JSON array. No markdown. Example:
       targetQty: typeof i.targetQty === 'number' ? i.targetQty : parseInt(String(i.targetQty ?? '0'), 10) || 0,
       currentQty: typeof i.currentQty === 'number' ? i.currentQty : parseInt(String(i.currentQty ?? '0'), 10) || 0,
       unit: typeof i.unit === 'string' ? i.unit.trim() : 'pcs',
+      category: typeof i.category === 'string' ? i.category.trim() : 'Sonstiges',
     }));
 }
