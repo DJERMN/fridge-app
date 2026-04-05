@@ -13,10 +13,10 @@ export interface ReconciledItem {
 }
 
 const IMAGE_MODELS = [
-  'google/gemma-3-27b-it:free',
-  'qwen/qwen3.6-plus:free',
-  'nvidia/nemotron-nano-12b-v2-vl:free',
-  'google/gemma-3-12b-it:free',
+  'google/gemma-3-4b-it:free',           // Fastest: smallest free vision model (4B)
+  'nvidia/nemotron-nano-12b-v2-vl:free', // Fast fallback: nano vision model
+  'google/gemma-3-12b-it:free',          // Medium fallback
+  'google/gemma-3-27b-it:free',          // Last resort: largest but slowest
 ];
 
 const TEXT_MODELS = [
