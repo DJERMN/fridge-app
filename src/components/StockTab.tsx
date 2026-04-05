@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { Camera, Upload, Loader2, X, Minus, Plus, ScanLine } from 'lucide-react';
+import { Camera, Upload, Loader2, X, Minus, Plus, ScanLine, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { StockItem } from '../types';
-import { analyzeImage } from '../services/gemini';
+import { analyzeImage, reconcileInventory } from '../services/gemini';
 import { compressImage } from '../utils/compressImage';
 
 interface Props {
@@ -36,6 +36,7 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState('image/jpeg');
   const [loading, setLoading] = useState(false);
+  const [merging, setMerging] = useState(false);
 
   // Only show items that exist in the current fridge (IST)
   const visibleItems = items.filter((i) => i.currentQty > 0);
@@ -103,6 +104,32 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
       item.id === id ? { ...item, currentQty: Math.max(0, (item.currentQty ?? 0) + delta) } : item
     ));
 
+  const handleMerge = async () => {
+    if (!apiKey) return toast.error('Please add your OpenRouter API key in Settings first.');
+    setMerging(true);
+    try {
+      const sollItems = items.filter((i) => i.targetQty > 0).map((i) => ({ name: i.name, targetQty: i.targetQty, unit: i.unit }));
+      const istItems = items.filter((i) => i.currentQty > 0).map((i) => ({ name: i.name, currentQty: i.currentQty, unit: i.unit }));
+      const reconciled = await reconcileInventory(sollItems, istItems, apiKey);
+      if (reconciled.length === 0) return toast.error('No result from AI. Try again.');
+      const updated: StockItem[] = reconciled.map((r) => ({
+        id: items.find((i) => i.name.toLowerCase() === r.name.toLowerCase())?.id ?? crypto.randomUUID(),
+        name: r.name,
+        unit: r.unit,
+        targetQty: r.targetQty,
+        currentQty: r.currentQty,
+        category: r.category,
+        addedAt: Date.now(),
+      }));
+      onItemsChange(updated);
+      toast.success('Duplicates merged!');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error merging items.');
+    } finally {
+      setMerging(false);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4 max-w-lg mx-auto">
       {/* IST scan area */}
@@ -154,6 +181,13 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
           In the fridge
           {visibleItems.length > 0 && <span className="text-slate-500 font-normal text-sm ml-2">({visibleItems.length})</span>}
         </h2>
+        {visibleItems.length > 0 && (
+          <button onClick={handleMerge} disabled={merging}
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs font-medium transition disabled:opacity-40">
+            <RefreshCw size={13} className={merging ? 'animate-spin' : ''} />
+            {merging ? 'Merging...' : 'Merge duplicates'}
+          </button>
+        )}
       </div>
 
       {visibleItems.length === 0 ? (
