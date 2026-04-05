@@ -3,6 +3,7 @@ import { Eye, EyeOff, Save, Key, ExternalLink, Camera, Upload, Loader2, Plus, X,
 import toast from 'react-hot-toast';
 import type { AppSettings, StockItem } from '../types';
 import { analyzeImage, normalizeItems } from '../services/gemini';
+import { compressImage } from '../utils/compressImage';
 
 interface Props {
   settings: AppSettings;
@@ -48,17 +49,19 @@ export default function SettingsTab({ settings, onSave, items, onItemsChange }: 
     toast.success('Settings saved!');
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setMimeType(file.type || 'image/jpeg');
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      setPreview(result);
-      setImageBase64(result.split(',')[1]);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { base64, mimeType: mt, originalKB, compressedKB } = await compressImage(file);
+      setMimeType(mt);
+      setImageBase64(base64);
+      setPreview(`data:${mt};base64,${base64}`);
+      if (originalKB > compressedKB)
+        toast(`Image compressed: ${originalKB}KB \u2192 ${compressedKB}KB`, { icon: '\u{1F5DC}' });
+    } catch {
+      toast.error('Failed to load image.');
+    }
   };
 
   const handleScan = async () => {

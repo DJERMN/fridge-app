@@ -4,6 +4,13 @@ export interface DetectedItem {
   unit: string;
 }
 
+export interface ReconciledItem {
+  name: string;
+  targetQty: number;
+  currentQty: number;
+  unit: string;
+}
+
 const MODEL = 'qwen/qwen3.6-plus:free';
 
 const SCAN_PROMPT = `Look at this image carefully.
@@ -17,8 +24,7 @@ For each item provide:
 Reply ONLY with a JSON array. No markdown backticks. No text before or after. Example:
 [
   {"name": "Milk", "quantity": 2, "unit": "bottles"},
-  {"name": "Eggs", "quantity": 6, "unit": "pcs"},
-  {"name": "Butter", "quantity": 1, "unit": "pack"}
+  {"name": "Eggs", "quantity": 6, "unit": "pcs"}
 ]
 
 If nothing is recognizable: []`;
@@ -35,7 +41,6 @@ function parseItems(text: string): DetectedItem[] {
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim();
-
   let parsed: RawItem[];
   try {
     parsed = JSON.parse(cleaned) as RawItem[];
@@ -46,7 +51,6 @@ function parseItems(text: string): DetectedItem[] {
       catch { return []; }
     } else { return []; }
   }
-
   if (!Array.isArray(parsed)) return [];
   return parsed
     .filter((item) => item && typeof item.name === 'string' && item.name.trim().length > 0)
@@ -68,14 +72,12 @@ async function callAPI(messages: object[], apiKey: string): Promise<string> {
     },
     body: JSON.stringify({ model: MODEL, messages }),
   });
-
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     if (response.status === 429) throw new Error('Rate limit reached. Please wait a moment and try again.');
     if (response.status === 401 || response.status === 403) throw new Error('Invalid API key. Please check Settings.');
     throw new Error(`Error ${response.status}: ${body.slice(0, 200)}`);
   }
-
   const data = await response.json();
   return data?.choices?.[0]?.message?.content ?? '[]';
 }
@@ -98,9 +100,8 @@ export async function analyzeImage(
 }
 
 /**
- * Second AI pass: normalizes new scan results against existing item names.
- * Prevents duplicates like "Milk" vs "Whole Milk" vs "2% Milk".
- * Only called when existing items are present.
+ * Normalizes new scan names against existing inventory names.
+ * Prevents duplicates like "Whole Milk" vs "Milk".
  */
 export async function normalizeItems(
   existingNames: string[],
@@ -109,25 +110,85 @@ export async function normalizeItems(
 ): Promise<DetectedItem[]> {
   if (existingNames.length === 0 || newItems.length === 0) return newItems;
 
-  const prompt = `You are merging a new fridge scan into an existing inventory.
+  const prompt = `Match each new scanned item to an existing inventory name if they refer to the same product.
 
-Existing inventory item names:
+Existing inventory names:
 ${existingNames.map((n) => `- ${n}`).join('\n')}
 
 New scanned items:
-${JSON.stringify(newItems, null, 2)}
+${JSON.stringify(newItems)}
 
-Task:
-1. For each new item, check if it refers to the same product as an existing inventory item (e.g. "Whole Milk" = "Milk", "OJ" = "Orange Juice", "Coke" = "Cola").
-2. If it matches an existing name, use the EXACT existing name.
-3. If it does not match any existing item, keep the new item name as-is.
-4. Do NOT merge different products. Do NOT remove items.
+Rules:
+- If a new item matches an existing name (same product), replace its name with the EXACT existing name.
+- If no match, keep the new item name as-is.
+- Never merge different products. Never remove items.
 
-Reply ONLY with a JSON array using the resolved names. No markdown. Example:
-[{"name": "Milk", "quantity": 2, "unit": "bottles"}, {"name": "Eggs", "quantity": 6, "unit": "pcs"}]`;
+Reply ONLY with a JSON array:
+[{"name": "...", "quantity": N, "unit": "..."}]`;
 
   const text = await callAPI([{ role: 'user', content: prompt }], apiKey);
-  const normalized = parseItems(text);
-  // Fallback: if normalization fails or returns empty, return original
-  return normalized.length > 0 ? normalized : newItems;
+  const result = parseItems(text);
+  return result.length > 0 ? result : newItems;
+}
+
+/**
+ * Full AI reconciliation of SOLL vs IST lists.
+ * Matches items across both lists by meaning, merges duplicates,
+ * returns a unified inventory with correct targetQty and currentQty.
+ */
+export async function reconcileInventory(
+  sollItems: { name: string; targetQty: number; unit: string }[],
+  istItems: { name: string; currentQty: number; unit: string }[],
+  apiKey: string
+): Promise<ReconciledItem[]> {
+  if (sollItems.length === 0 && istItems.length === 0) return [];
+
+  const prompt = `You are reconciling two fridge inventory lists into one unified inventory.
+
+TARGET STOCK (SOLL) - what should always be there:
+${JSON.stringify(sollItems)}
+
+CURRENT STOCK (IST) - what is currently in the fridge:
+${JSON.stringify(istItems)}
+
+Task:
+1. Match items that refer to the same product across both lists (e.g. "Whole Milk" = "Milk", "OJ" = "Orange Juice").
+2. Use the clearest, most common product name for matched pairs.
+3. Items only in SOLL get currentQty: 0.
+4. Items only in IST get targetQty: 0.
+5. Never create duplicate entries for the same product.
+
+Reply ONLY with a JSON array. No markdown. Example:
+[
+  {"name": "Milk", "targetQty": 2, "currentQty": 1, "unit": "bottles"},
+  {"name": "Eggs", "targetQty": 12, "currentQty": 12, "unit": "pcs"},
+  {"name": "Leftover Pizza", "targetQty": 0, "currentQty": 2, "unit": "slices"}
+]`;
+
+  const text = await callAPI([{ role: 'user', content: prompt }], apiKey);
+  const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+  interface RawReconciled { name?: string; targetQty?: number | string; currentQty?: number | string; unit?: string; }
+  let parsed: RawReconciled[];
+  try {
+    parsed = JSON.parse(cleaned) as RawReconciled[];
+  } catch {
+    const match = cleaned.match(/\[[\s\S]*\]/);
+    if (match) {
+      try { parsed = JSON.parse(match[0]) as RawReconciled[]; }
+      catch { throw new Error('Reconciliation failed: invalid AI response.'); }
+    } else {
+      throw new Error('Reconciliation failed: invalid AI response.');
+    }
+  }
+
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((i) => i && typeof i.name === 'string' && i.name.trim().length > 0)
+    .map((i) => ({
+      name: i.name!.trim(),
+      targetQty: typeof i.targetQty === 'number' ? i.targetQty : parseInt(String(i.targetQty ?? '0'), 10) || 0,
+      currentQty: typeof i.currentQty === 'number' ? i.currentQty : parseInt(String(i.currentQty ?? '0'), 10) || 0,
+      unit: typeof i.unit === 'string' ? i.unit.trim() : 'pcs',
+    }));
 }
