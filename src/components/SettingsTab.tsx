@@ -110,7 +110,7 @@ export default function SettingsTab({ settings, onSave, items, onItemsChange }: 
 
   const adjustTarget = (id: string, delta: number) =>
     onItemsChange(items.map((item) =>
-      item.id === id ? { ...item, targetQty: Math.max(0, item.targetQty + delta) } : item
+      item.id === id ? { ...item, targetQty: Math.max(0, (item.targetQty ?? 0) + delta) } : item
     ));
 
   const removeItem = (id: string) => onItemsChange(items.filter((i) => i.id !== id));
@@ -264,7 +264,7 @@ export default function SettingsTab({ settings, onSave, items, onItemsChange }: 
                     className="w-7 h-7 rounded-lg bg-slate-700 hover:bg-slate-600 text-white flex items-center justify-center transition">
                     <Minus size={12} />
                   </button>
-                  <span className="w-7 text-center text-white font-bold text-sm">{item.targetQty}</span>
+                  <span className="w-7 text-center text-white font-bold text-sm">{item.targetQty ?? 0}</span>
                   <button onClick={() => adjustTarget(item.id, 1)}
                     className="w-7 h-7 rounded-lg bg-slate-700 hover:bg-slate-600 text-white flex items-center justify-center transition">
                     <Plus size={12} />

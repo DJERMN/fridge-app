@@ -101,7 +101,7 @@ export default function StockTab({ items, apiKey, onItemsChange }: Props) {
 
   const adjustCurrent = (id: string, delta: number) =>
     onItemsChange(items.map((item) =>
-      item.id === id ? { ...item, currentQty: Math.max(0, item.currentQty + delta) } : item
+      item.id === id ? { ...item, currentQty: Math.max(0, (item.currentQty ?? 0) + delta) } : item
     ));
 
   return (
