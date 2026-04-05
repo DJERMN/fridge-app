@@ -11,8 +11,18 @@ export interface ReconciledItem {
   unit: string;
 }
 
-const IMAGE_MODEL = 'google/gemma-3-27b-it:free'; // Best free vision model
-const TEXT_MODEL = 'qwen/qwen3.6-plus:free';      // Best free text model
+const IMAGE_MODELS = [
+  'google/gemma-3-27b-it:free',
+  'qwen/qwen3.6-plus:free',
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'google/gemma-3-12b-it:free',
+];
+
+const TEXT_MODELS = [
+  'qwen/qwen3.6-plus:free',
+  'google/gemma-3-27b-it:free',
+  'google/gemma-3-12b-it:free',
+];
 
 const SCAN_PROMPT_BASE = `Look at this image carefully.
 
@@ -72,25 +82,30 @@ function parseItems(text: string): DetectedItem[] {
     }));
 }
 
-async function callAPI(messages: object[], apiKey: string, model: string): Promise<string> {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://djermn.github.io/fridge-app/',
-      'X-Title': 'FridgeMate',
-    },
-    body: JSON.stringify({ model, messages }),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    if (response.status === 429) throw new Error('Rate limit reached. Please wait a moment and try again.');
-    if (response.status === 401 || response.status === 403) throw new Error('Invalid API key. Please check Settings.');
-    throw new Error(`Error ${response.status}: ${body.slice(0, 200)}`);
+async function callAPI(messages: object[], apiKey: string, models: string[]): Promise<string> {
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://djermn.github.io/fridge-app/',
+        'X-Title': 'FridgeMate',
+      },
+      body: JSON.stringify({ model, messages }),
+    });
+    if (!response.ok) {
+      if (response.status === 429 && i < models.length - 1) continue; // try next model
+      const body = await response.text().catch(() => '');
+      if (response.status === 429) throw new Error('All models are rate limited. Please try again in a minute.');
+      if (response.status === 401 || response.status === 403) throw new Error('Invalid API key. Please check Settings.');
+      throw new Error(`Error ${response.status}: ${body.slice(0, 200)}`);
+    }
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content ?? '[]';
   }
-  const data = await response.json();
-  return data?.choices?.[0]?.message?.content ?? '[]';
+  throw new Error('All models are rate limited. Please try again in a minute.');
 }
 
 export async function analyzeImage(
@@ -107,7 +122,7 @@ export async function analyzeImage(
         { type: 'text', text: buildScanPrompt(existingNames) },
       ],
     },
-  ], apiKey, IMAGE_MODEL);
+  ], apiKey, IMAGE_MODELS);
   return parseItems(text);
 }
 
@@ -137,7 +152,7 @@ Rules:
 Reply ONLY with a JSON array:
 [{"name": "...", "quantity": N, "unit": "..."}]`;
 
-  const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODEL);
+  const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODELS);
   const result = parseItems(text);
   return result.length > 0 ? result : newItems;
 }
@@ -176,7 +191,7 @@ Reply ONLY with a JSON array. No markdown. Example:
   {"name": "Leftover Pizza", "targetQty": 0, "currentQty": 2, "unit": "slices"}
 ]`;
 
-  const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODEL);
+  const text = await callAPI([{ role: 'user', content: prompt }], apiKey, TEXT_MODELS);
   const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 
   interface RawReconciled { name?: string; targetQty?: number | string; currentQty?: number | string; unit?: string; }
